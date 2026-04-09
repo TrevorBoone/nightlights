@@ -5,64 +5,28 @@ import random
 from dataclasses import dataclass, asdict
 import csv
 
-TIME_OF_TREATMENT = timedelta(minutes = 10)
-TIME_BETWEEN_TREATMENTS = timedelta(minutes = 10)
-SUN_DELAY = timedelta(minutes = 30)
-TIMEZONE = tz.gettz("US/Central")
+from argparse import ArgumentParser
+
+################
+#              #
+#  Constants   #
+#              #
+################
 
 
-OFF = 0
-AMBER = 1
-OTHER_COLOR = 2
-COLOR_3 = 3
-
-LAT = 40.42128973283434
-LONG = -86.90005225247548
-
-SUN = Sun(LAT, LONG)
-
-def create_schedule(first_day: date, last_day:date):
-    current = first_day
-    treatments = []
-    while current <= last_day:
-        curr_datetime = datetime.combine(current, time(hour=12, tzinfo=TIMEZONE))
-        start = SUN.get_sunset_time(curr_datetime, time_zone = TIMEZONE) + SUN_DELAY
-        end = SUN.get_sunrise_time(curr_datetime, time_zone = TIMEZONE) - SUN_DELAY
-        start = start.replace(second = 0, microsecond = 0)
-        end = end.replace(second = 0, microsecond = 0)
-        new_treatments = create_day(start, end)
-        print("\n".join([t.debug_str() for t in new_treatments]))
-        treatments.extend(new_treatments)
-        current = current + timedelta(days = 1)
-    
-    return treatments
+## normally most of these constants would be command line arguments but for ease of use
+## they are just constants that the user of the program can change themselves.
+START_DATE = date(2026, 4, 1)
+END_DATE = date(2026, 4, 1)
 
 
-@dataclass
-class Treatment:
-    # 0 is off
-    light: int
-    start: datetime
-    end: datetime
 
-    def __repr__(self) -> str: 
-        return f"{self.light}, {self.start}, {self.end}"
 
-def create_day(start: datetime, end:datetime):
-    current = start
-    last_treatment = 0
-    treatments = []
-    while current < end:
-        ordering = create_ordering(last_treatment)
-        for light_index in ordering:
-            treatments.append(Treatment(light=light_index, start = current, end = current + TIME_OF_TREATMENT))
-            current = current + TIME_OF_TREATMENT + TIME_BETWEEN_TREATMENTS
-    return treatments
-
-def swap(array, i, j):
-    if i == j:
-        return
-    array[i], array[j] = array[j], array[i]
+############################
+#                          #
+#  Creating the schedule   #
+#                          #
+############################
 
 def create_ordering(last_treatment):
     treatments = [0, 1, 2, 3]
@@ -75,14 +39,60 @@ def create_ordering(last_treatment):
         swap(treatments, random.randint(1,3))
 
     return treatments
-    
-def write(treatments, filename = "test.csv"):
-    with open(filename, "w") as f:
-        writer = csv.writer(f)
-        for t in treatments:
-            writer.writerow([t.light, t.start.isoformat(), t.end.isoformat()])
 
-def read(filename = "test.csv"):
+def treatment_sequence_generator():
+    last_treatment = 0
+    while True:
+        ordering = create_ordering(last_treatment)
+        for o in ordering:
+            yield o
+
+
+@dataclass
+class Treatment:
+    # 0 is no lights on
+    light: int
+    start: datetime
+    end: datetime
+    ## whether or not it had an issue or needed to be manually started.
+    error: bool
+
+    ## this makes it so it this class in a concise way for debugging.
+    def __repr__(self) -> str: 
+        return f"{self.light}, {self.start}, {self.end}"
+
+
+######################
+#                    #
+#  Other Functions   #
+#                    #
+######################
+
+'''
+Swap the i-th and j-th elements in an array (n.b. array indexes start at 0 in python).
+'''
+def swap(array, i, j):
+    if i == j:
+        return
+    array[i], array[j] = array[j], array[i]
+
+'''
+Write the treatments as a csv to the file specified.
+'''
+def write_treatment(treatment, filename = "logs/test.csv") -> None:
+    with open(filename, "a") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            treatment.light,
+            treatment.start.isoformat(),
+            treatment.end.isoformat(),
+            treatment.error
+            ])
+
+'''
+Reads the csv file and returns the contents of the file as list[Treatment]
+'''
+def read(filename = "logs/test.csv") -> list[Treatment]:
     treatments = []
     with open(filename) as f:
         r = csv.reader(f)
@@ -92,6 +102,12 @@ def read(filename = "test.csv"):
             treatments.append(Treatment(int(row[0]), start, end))
     return treatments
             
+
+###########################
+#                         #
+#  Running the program   #
+#                         #
+###########################
 
 if __name__ == "__main__":
     TIME_OF_TREATMENT = timedelta(seconds = 10)
