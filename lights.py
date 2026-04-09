@@ -34,8 +34,7 @@ SUN = Sun(LAT, LONG)
 
 class Lighter:
     def __init__(self):
-        #self.plugs = asyncio.run(dicsover_plugs())
-        self.plugs = [1, 2, 3]
+        self.plugs = asyncio.run(dicsover_plugs())
         signal.signal(signal.SIGINT, self.interrupt)
         self.current = None
         self.interrupted = False
@@ -46,11 +45,9 @@ class Lighter:
             try:
                 for i, p in enumerate(self.plugs):                                  
                     if light - 1 == i:
-                        print(f"on {i+1}")
-                        #asyncio.run(p.turn_on())
+                        asyncio.run(p.turn_on())
                     else:
-                        print(f"off {i+1}")
-                        #asyncio.run(p.turn_off())
+                        asyncio.run(p.turn_off())
             except:
                 self.sleep_until(time.now() + timedelta(seconds=10))
                 if attempt == 0:
