@@ -39,6 +39,12 @@ class Lighter:
         self.current = None
         self.interrupted = False
 
+    '''
+    Turns on the specified light and turns other lights off (lights are numbered 1, 2, 3).
+    If light is 0, it will turn all lights off.
+
+    *** NOTE *** Will retry forever if it loses connection to the lights.
+    '''
     def lights(self, light: int) -> bool:
         attempt = 0
         while True:
@@ -67,6 +73,9 @@ class Lighter:
             if self.interrupted:
                 return True
 
+    '''
+    Runs treatments from start time to end time.
+    '''
     def run_treatments(self, start: datetime, end: datetime) -> None:
         self.lights(0)
 
@@ -91,11 +100,22 @@ class Lighter:
                 error = start_error or end_error))
             next_treatment_time = off_time + TIME_BETWEEN_TREATMENTS
 
+    '''
+    Tells the program to stop immediately.
+
+    Normally this would call sys.exit but it just sets a flag and lets lights(...) and run_treatments(...)
+    to do clean up.
+    '''
     def interrupt(self, signum, frame):
         logging.warning("Received SIGINT. Shutting down")
         requests.post(SLACK_URL, json={'text': "Interrupted"})
         self.interrupted = True
+    
+    '''
+    Sleeps until the specified time.
 
+    Wakes up periodically to check interruption
+    '''
     def sleep_until(self, t: datetime) -> None:
         now = datetime.now()
         while now <= t and not self.interrupted:
@@ -103,6 +123,11 @@ class Lighter:
             sleep(to_sleep)
             now = datetime.now()
 
+
+'''
+This is the entrypoint for this program. It will run from some time after sunset (or now, if now is after the sunset)
+until some time before sunrise.
+'''
 def run() -> None:
     l = Lighter()
     
@@ -130,14 +155,14 @@ def run() -> None:
         logging.error("Couldn't create treatments because of issue determining start or end times")
         sys.exit(1)
 
-
-    start = datetime.now() + timedelta(seconds=5)
-    end = datetime.now() + timedelta(minutes=1)
     requests.post(SLACK_URL, json={'text': f"Starting treatments at {start}"})
     l.run_treatments(start, end)
     requests.post(SLACK_URL, json={'text': "Treatments done!"})
     print("***** DONE! *****")
 
+'''
+This will check the local network for plugs with the specified alias.
+'''
 async def dicsover_plugs() -> list[any]:
     found = await Discover.discover()
     alias = 'TP-LINK_Power Strip_53A7'
